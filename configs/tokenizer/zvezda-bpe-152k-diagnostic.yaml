@@ -1,0 +1,112 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+revision: "0.5-dense-vs-moe-diagnostic"
+
+tokenizer:
+  name: zvezda-bpe-152k-diagnostic
+  algorithm: bpe
+  implementation: huggingface_tokenizers
+  vocab_size: 152576
+  normalizer:
+    - nfkc
+    - preserve_whitespace
+  byte_fallback: true
+  add_bos_token: false
+  add_prefix_space: false
+  clean_up_tokenization_spaces: false
+  unk_token: null
+  pad_token: "<|endoftext|>"
+  eos_token: "<|im_end|>"
+  chat_template_file: configs/tokenizer/chat_template.jinja
+  model_max_length: 32768
+
+model_binding:
+  shared_vocab_size: 152576
+  compatible_configs:
+    - configs/zvezda-15b-dense.yaml
+    - configs/zvezda-100b-a15b-moe.yaml
+  embedding_rule: untied_input_output
+  note: "One tokenizer bundle is shared by dense and MoE diagnostic models."
+
+training_sample:
+  minimum_raw_text_gb: 10
+  corpus_manifest: configs/tokenizer/corpus-manifest.yaml
+  manifest_schema: configs/tokenizer/corpus-manifest.schema.yaml
+  must_match_segments:
+    russian_high_quality: 0.20
+    english_web: 0.25
+    code: 0.20
+    stem_math: 0.15
+    multilingual_non_ru_en: 0.10
+    tool_action_state: 0.05
+    heldout_validation: 0.05
+  no_mock_data: true
+
+special_tokens:
+  control:
+    - "<|endoftext|>"
+    - "<|im_start|>"
+    - "<|im_end|>"
+  fim:
+    - "<|fim_prefix|>"
+    - "<|fim_middle|>"
+    - "<|fim_suffix|>"
+    - "<|fim_pad|>"
+  repository:
+    - "<|repo_name|>"
+    - "<|file_sep|>"
+  tool:
+    - "<tool_call>"
+    - "</tool_call>"
+    - "<tool_response>"
+    - "</tool_response>"
+  action:
+    - "<|action_start|>"
+    - "<|action_end|>"
+    - "<|action_error|>"
+    - "<|action_observation|>"
+  machine_state:
+    - "<|state_start|>"
+    - "<|state_end|>"
+    - "<|state_delta|>"
+  memory:
+    - "<|memory_read|>"
+    - "<|memory_write|>"
+  scratch:
+    - "<|scratch_start|>"
+    - "<|scratch_end|>"
+
+gates:
+  unk_rate_max: 0.0
+  utf8_roundtrip_required: true
+  special_token_collision_max: 0
+  ru_fertility_ratio_vs_english_max: 1.20
+  code_fertility_ratio_vs_qwen2_5_max: 1.15
+  json_tool_overhead_ratio_vs_qwen_mimo_max: 1.10
+  whitespace_sensitive_roundtrip_required: true
+  required_segments:
+    - russian_high_quality
+    - english_web
+    - code
+    - stem_math
+    - tool_action_state
+    - heldout_validation
+  report_required:
+    - ru_clean
+    - en_clean
+    - code_python
+    - code_typescript
+    - code_rust
+    - json_tool_calls
+    - xml_tool_calls
+    - markdown
+    - math_latex
+
+bundle_output:
+  required_files:
+    - tokenizer.json
+    - tokenizer_config.json
+    - special_tokens_map.json
+    - chat_template.jinja
+    - fertility_report.json
+    - bundle_manifest.json

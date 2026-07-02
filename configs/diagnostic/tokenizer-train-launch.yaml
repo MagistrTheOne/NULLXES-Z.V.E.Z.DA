@@ -1,0 +1,25 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+revision: "0.5-dense-vs-moe-diagnostic"
+purpose: shared_tokenizer_training_for_diagnostic_models
+
+tokenizer:
+  config: configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml
+  corpus_manifest: configs/tokenizer/corpus-manifest.yaml
+  manifest_schema: configs/tokenizer/corpus-manifest.schema.yaml
+  output_dir: null
+  baseline_fertility_report: null
+
+models:
+  - configs/zvezda-15b-dense.yaml
+  - configs/zvezda-100b-a15b-moe.yaml
+
+commands:
+  validate_manifest: python scripts/validate_corpus_manifest.py --manifest configs/tokenizer/corpus-manifest.yaml
+  train: python scripts/train_tokenizer.py --config configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml --corpus-manifest configs/tokenizer/corpus-manifest.yaml --output-dir <output_dir>
+  validate_gates: python scripts/validate_tokenizer_gates.py --config configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml --fertility-report <output_dir>/fertility_report.json
+
+notes:
+  - Populate corpus-manifest.yaml with real licensed files before training.
+  - output_dir must be set at launch; no mock corpus or fertility artifacts.
+  - Both diagnostic models share one tokenizer bundle (vocab 152576).

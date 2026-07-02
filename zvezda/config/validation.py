@@ -71,4 +71,13 @@ def validate(config: dict[str, Any]) -> list[str]:
     _require_equal(errors, "kv_cache.fp8_bytes_per_sequence", _get(config, "kv_cache.fp8_bytes_per_sequence"), accounting.fp8_kv_bytes_per_sequence)
     _require_equal(errors, "kv_cache.bf16_bytes_per_sequence", _get(config, "kv_cache.bf16_bytes_per_sequence"), accounting.bf16_kv_bytes_per_sequence)
 
+    tokenizer_cfg = _get(config, "tokenizer")
+    if isinstance(tokenizer_cfg, Mapping):
+        model_vocab = _get(config, "model.dimensions.vocab_size")
+        tokenizer_vocab = tokenizer_cfg.get("vocab_size")
+        if tokenizer_vocab is not None and model_vocab is not None and tokenizer_vocab != model_vocab:
+            errors.append(
+                f"tokenizer.vocab_size ({tokenizer_vocab}) must match model.dimensions.vocab_size ({model_vocab})"
+            )
+
     return errors

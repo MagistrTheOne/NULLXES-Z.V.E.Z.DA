@@ -1,0 +1,5 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+purpose: diagnostic_tokenizer_training
+no_mock_data: true
+files: []

@@ -11,52 +11,13 @@ from pathlib import Path
 from typing import Any
 import unicodedata
 
+from zvezda.tokenizer.special_tokens import flatten_special_tokens
+
 
 @dataclass(frozen=True)
 class CorpusFile:
     segment: str
     path: Path
-
-
-def flatten_special_tokens(config: dict[str, Any]) -> list[str]:
-    special = config.get("special_tokens")
-    if not isinstance(special, dict):
-        raise ValueError("tokenizer config must define special_tokens mapping")
-    tokens: list[str] = []
-    for group_tokens in special.values():
-        if not isinstance(group_tokens, list):
-            raise ValueError("special token groups must be lists")
-        tokens.extend(str(token) for token in group_tokens)
-    if len(tokens) != len(set(tokens)):
-        duplicates = sorted({token for token in tokens if tokens.count(token) > 1})
-        raise ValueError(f"duplicate special tokens: {duplicates}")
-    return tokens
-
-
-def load_corpus_manifest(path: Path) -> list[CorpusFile]:
-    with path.open("r", encoding="utf-8") as handle:
-        manifest = json.load(handle)
-    files = manifest.get("files")
-    if not isinstance(files, list) or not files:
-        raise ValueError("corpus manifest must contain non-empty 'files' list")
-
-    corpus_files: list[CorpusFile] = []
-    for entry in files:
-        if not isinstance(entry, dict):
-            raise ValueError("each corpus manifest entry must be an object")
-        segment = entry.get("segment")
-        raw_path = entry.get("path")
-        if not isinstance(segment, str) or not segment:
-            raise ValueError("each corpus file must define non-empty segment")
-        if not isinstance(raw_path, str) or not raw_path:
-            raise ValueError("each corpus file must define non-empty path")
-        file_path = Path(raw_path)
-        if not file_path.exists():
-            raise FileNotFoundError(file_path)
-        if not file_path.is_file():
-            raise ValueError(f"corpus path is not a file: {file_path}")
-        corpus_files.append(CorpusFile(segment=segment, path=file_path))
-    return corpus_files
 
 
 def iter_segmented_normalized_lines(files: Iterable[CorpusFile]) -> Iterable[tuple[str, str]]:
@@ -113,7 +74,38 @@ def train_tokenizer(config: dict[str, Any], corpus_files: list[CorpusFile]) -> A
     return tokenizer
 
 
-def fertility_report(tokenizer: Any, corpus_files: list[CorpusFile]) -> dict[str, Any]:
+def _quality_checks(tokenizer: Any, corpus_files: list[CorpusFile], config: dict[str, Any]) -> dict[str, Any]:
+    special_tokens = flatten_special_tokens(config)
+    unk_tokens = 0
+    total_tokens = 0
+    collisions = 0
+    utf8_ok = True
+    whitespace_ok = True
+
+    for token in special_tokens:
+        probe = tokenizer.encode(token)
+        if len(probe.ids) != 1:
+            collisions += 1
+
+    for _, normalized in iter_segmented_normalized_lines(corpus_files):
+        encoded = tokenizer.encode(normalized)
+        total_tokens += len(encoded.ids)
+        decoded = tokenizer.decode(encoded.ids, skip_special_tokens=False)
+        if decoded.encode("utf-8") != normalized.encode("utf-8"):
+            utf8_ok = False
+        if "  " in normalized or normalized.startswith(" ") or normalized.endswith(" "):
+            if decoded != normalized:
+                whitespace_ok = False
+
+    return {
+        "unk_rate": unk_tokens / max(total_tokens, 1),
+        "utf8_roundtrip": utf8_ok,
+        "whitespace_roundtrip": whitespace_ok,
+        "special_token_collisions": collisions,
+    }
+
+
+def fertility_report(tokenizer: Any, corpus_files: list[CorpusFile], config: dict[str, Any] | None = None) -> dict[str, Any]:
     stats: dict[str, dict[str, int]] = defaultdict(lambda: {"chars": 0, "bytes": 0, "tokens": 0, "records": 0})
     for segment, normalized in iter_segmented_normalized_lines(corpus_files):
         encoded = tokenizer.encode(normalized)
@@ -134,10 +126,23 @@ def fertility_report(tokenizer: Any, corpus_files: list[CorpusFile]) -> dict[str
             "tokens_per_byte": tokens / byte_count,
             "chars_per_token": chars / max(tokens, 1),
         }
-    return {"segments": segments}
+
+    report: dict[str, Any] = {"segments": segments}
+    if config is not None:
+        report.update(_quality_checks(tokenizer, corpus_files, config))
+    return report
 
 
-def save_outputs(tokenizer: Any, output_dir: Path, report: dict[str, Any]) -> None:
+def save_outputs(
+    tokenizer: Any,
+    output_dir: Path,
+    report: dict[str, Any],
+    *,
+    config: dict[str, Any],
+    repo_root: Path,
+) -> None:
+    from zvezda.tokenizer.bundle import write_bundle
+
     output_dir.mkdir(parents=True, exist_ok=True)
     tokenizer.save(str(output_dir / "tokenizer.json"))
     model = tokenizer.model
@@ -145,3 +150,7 @@ def save_outputs(tokenizer: Any, output_dir: Path, report: dict[str, Any]) -> No
         model.save(str(output_dir))
     with (output_dir / "fertility_report.json").open("w", encoding="utf-8") as handle:
         json.dump(report, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        handle.write("\n")
+
+    actual_vocab_size = tokenizer.get_vocab_size()
+    write_bundle(config, output_dir, repo_root=repo_root, actual_vocab_size=actual_vocab_size)

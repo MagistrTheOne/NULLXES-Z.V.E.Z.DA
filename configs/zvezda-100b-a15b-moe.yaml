@@ -7,6 +7,12 @@ owner:
   contact: ceo@nullxes.com
   operator: MagistrTheOne
 
+tokenizer:
+  spec: configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml
+  vocab_size: 152576
+  bundle_dir: null
+  shared_with: configs/zvezda-15b-dense.yaml
+
 model:
   name: zvezda-100b-a15b-moe
   class: decoder_only_causal_moe

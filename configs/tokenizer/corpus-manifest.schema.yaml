@@ -1,0 +1,43 @@
+schema_version: 1
+required_fields:
+  - schema_version
+  - program
+  - files
+
+file_entry_required_fields:
+  - segment
+  - path
+  - license
+  - content_hash
+
+allowed_segments:
+  - russian_high_quality
+  - english_web
+  - code
+  - stem_math
+  - multilingual_non_ru_en
+  - tool_action_state
+  - heldout_validation
+
+report_segments:
+  - ru_clean
+  - en_clean
+  - code_python
+  - code_typescript
+  - code_rust
+  - json_tool_calls
+  - xml_tool_calls
+  - markdown
+  - math_latex
+
+validation_rules:
+  files_must_be_non_empty: true
+  paths_must_exist: true
+  paths_must_be_files: true
+  segment_must_be_allowed: true
+  license_must_not_be_unknown: true
+  content_hash_algorithm:
+    - sha256
+    - blake3
+  no_duplicate_paths: true
+  no_mock_data: true
