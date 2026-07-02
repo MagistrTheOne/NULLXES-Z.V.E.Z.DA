@@ -53,13 +53,11 @@ def validate_gates(
             errors.append(f"unk_rate {unk_rate} exceeds max {unk_rate_max}")
 
     if gates.get("utf8_roundtrip_required"):
-        roundtrip = report.get("utf8_roundtrip")
-        if roundtrip is not True:
+        if report.get("utf8_roundtrip") is not True:
             errors.append("utf8 roundtrip check failed or missing")
 
     if gates.get("whitespace_sensitive_roundtrip_required"):
-        ws_roundtrip = report.get("whitespace_roundtrip")
-        if ws_roundtrip is not True:
+        if report.get("whitespace_roundtrip") is not True:
             errors.append("whitespace-sensitive roundtrip check failed or missing")
 
     collision_max = gates.get("special_token_collision_max")
@@ -68,47 +66,47 @@ def validate_gates(
         if collisions > collision_max:
             errors.append(f"special token collisions {collisions} exceed max {collision_max}")
 
-    ru_en_max = gates.get("ru_fertility_ratio_vs_english_max")
-    if isinstance(ru_en_max, (int, float)):
-        ratio = _segment_ratio(report, "russian_high_quality", "english_web", "tokens_per_char")
+    ru_code_max = gates.get("ru_fertility_ratio_vs_code_max")
+    if isinstance(ru_code_max, (int, float)):
+        ratio = _segment_ratio(report, "ru_curated", "code_verified", "tokens_per_char")
         if ratio is None:
-            ratio = _segment_ratio(report, "ru_clean", "en_clean", "tokens_per_char")
+            ratio = _segment_ratio(report, "ru_clean", "code_python", "tokens_per_char")
         if ratio is None:
-            errors.append("cannot compute RU/EN fertility ratio: missing russian_high_quality or english_web segments")
-        elif ratio > ru_en_max:
-            errors.append(f"RU/EN fertility ratio {ratio:.4f} exceeds max {ru_en_max}")
+            errors.append("cannot compute RU/code fertility ratio")
+        elif ratio > ru_code_max:
+            errors.append(f"RU/code fertility ratio {ratio:.4f} exceeds max {ru_code_max}")
 
-    code_qwen_max = gates.get("code_fertility_ratio_vs_qwen2_5_max")
-    if isinstance(code_qwen_max, (int, float)):
-        code_ratio = _segment_ratio(report, "code", "english_web", "tokens_per_byte")
+    code_baseline_max = gates.get("code_fertility_ratio_vs_baseline_max")
+    if isinstance(code_baseline_max, (int, float)):
+        code_ratio = _segment_ratio(report, "code_verified", "ru_curated", "tokens_per_byte")
         if code_ratio is None:
-            code_ratio = _segment_ratio(report, "code_python", "en_clean", "tokens_per_byte")
+            code_ratio = _segment_ratio(report, "code_python", "ru_clean", "tokens_per_byte")
         baseline_ratio = None
         if baseline_report is not None:
-            baseline_ratio = _segment_ratio(baseline_report, "code", "english_web", "tokens_per_byte")
+            baseline_ratio = _segment_ratio(baseline_report, "code_verified", "ru_curated", "tokens_per_byte")
             if baseline_ratio is None:
-                baseline_ratio = _segment_ratio(baseline_report, "code_python", "en_clean", "tokens_per_byte")
+                baseline_ratio = _segment_ratio(baseline_report, "code_python", "ru_clean", "tokens_per_byte")
         if code_ratio is None:
-            errors.append("cannot compute code fertility ratio: missing code segment")
+            errors.append("cannot compute code fertility ratio")
         elif baseline_ratio is None:
-            errors.append("code_fertility_ratio_vs_qwen2_5 gate requires --baseline-fertility-report")
-        elif code_ratio / baseline_ratio > code_qwen_max:
+            errors.append("code_fertility_ratio_vs_baseline gate requires --baseline-fertility-report")
+        elif code_ratio / baseline_ratio > code_baseline_max:
             errors.append(
-                f"code/Qwen fertility ratio {code_ratio / baseline_ratio:.4f} exceeds max {code_qwen_max}"
+                f"code/baseline fertility ratio {code_ratio / baseline_ratio:.4f} exceeds max {code_baseline_max}"
             )
 
-    json_tool_max = gates.get("json_tool_overhead_ratio_vs_qwen_mimo_max")
+    json_tool_max = gates.get("json_tool_overhead_ratio_vs_baseline_max")
     if isinstance(json_tool_max, (int, float)):
-        tool_ratio = segments.get("tool_action_state", {}).get("tokens_per_char")
+        tool_ratio = segments.get("tool_action_traces", {}).get("tokens_per_char")
         if tool_ratio is None:
             tool_ratio = segments.get("json_tool_calls", {}).get("tokens_per_char")
         baseline_tool = None
         if baseline_report is not None:
             baseline_tool = baseline_report.get("segments", {}).get("json_tool_calls", {}).get("tokens_per_char")
             if baseline_tool is None:
-                baseline_tool = baseline_report.get("segments", {}).get("tool_action_state", {}).get("tokens_per_char")
+                baseline_tool = baseline_report.get("segments", {}).get("tool_action_traces", {}).get("tokens_per_char")
         if tool_ratio is None:
-            errors.append("cannot compute tool overhead: missing tool_action_state or json_tool_calls segment")
+            errors.append("cannot compute tool overhead: missing tool_action_traces or json_tool_calls segment")
         elif baseline_tool is None:
             errors.append("json_tool_overhead gate requires --baseline-fertility-report")
         elif float(tool_ratio) / float(baseline_tool) > json_tool_max:

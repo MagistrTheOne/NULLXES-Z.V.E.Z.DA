@@ -1,6 +1,9 @@
 schema_version: 1
 program: Z.V.E.Z.D.A
 mix_name: pretrain-mix-v0
+deprecated: true
+superseded_by: configs/data/init-curriculum-v1.yaml
+note: "Web crawl mix retired. Use init-curriculum-v1 (cloud-only, verifier-gated)."
 token_target:
   first_large_phase_tokens_min: 15000000000000
   first_large_phase_tokens_max: 30000000000000

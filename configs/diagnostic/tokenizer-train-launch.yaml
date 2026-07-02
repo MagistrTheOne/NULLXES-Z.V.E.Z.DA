@@ -1,25 +1,18 @@
 schema_version: 1
 program: Z.V.E.Z.D.A
-revision: "0.5-dense-vs-moe-diagnostic"
-purpose: shared_tokenizer_training_for_diagnostic_models
-
-tokenizer:
-  config: configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml
-  corpus_manifest: configs/tokenizer/corpus-manifest.yaml
-  manifest_schema: configs/tokenizer/corpus-manifest.schema.yaml
-  output_dir: null
-  baseline_fertility_report: null
-
-models:
-  - configs/zvezda-15b-dense.yaml
-  - configs/zvezda-100b-a15b-moe.yaml
+revision: "0.7-runpod-only"
+purpose: runpod_init_and_smoke_train
+pretrain_claim: false
+launch_provider: runpod
 
 commands:
-  validate_manifest: python scripts/validate_corpus_manifest.py --manifest configs/tokenizer/corpus-manifest.yaml
-  train: python scripts/train_tokenizer.py --config configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml --corpus-manifest configs/tokenizer/corpus-manifest.yaml --output-dir <output_dir>
-  validate_gates: python scripts/validate_tokenizer_gates.py --config configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml --fertility-report <output_dir>/fertility_report.json
+  validate_manifest: python scripts/validate_corpus_manifest.py --manifest configs/tokenizer/corpus-manifest.yaml --probe-storage
+  train_tokenizer: python scripts/train_tokenizer.py --config configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml --corpus-manifest configs/tokenizer/corpus-manifest.yaml --storage-config configs/data/runpod-storage-v0.yaml --output-dir /workspace/zvezda/artifacts/tokenizer --probe-storage
+  pod_preflight: python scripts/pod_preflight.py --launch configs/diagnostic/pod-launch.yaml --probe-storage
+  init_checkpoint: python scripts/init_checkpoint.py --config configs/zvezda-15b-dense.yaml --init-policy configs/init/init-policy-v0.yaml --output-dir /workspace/zvezda/artifacts/init/zvezda-15b-dense --global-seed 20260703
+  smoke_train: torchrun --nproc_per_node=8 scripts/smoke_train.py --launch configs/diagnostic/pod-launch.yaml
 
 notes:
-  - Populate corpus-manifest.yaml with real licensed files before training.
-  - output_dir must be set at launch; no mock corpus or fertility artifacts.
-  - Both diagnostic models share one tokenizer bundle (vocab 152576).
+  - RunPod only. Corpus on network volume via runpod:// paths.
+  - No AWS. VK/Yandex documented in storage-providers-internal.yaml — not active.
+  - Stubs, placeholders, and template URIs fail validation.

@@ -22,14 +22,26 @@ def load_yaml(path: Path) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate a tokenizer corpus manifest against schema.")
+    parser = argparse.ArgumentParser(description="Validate a RunPod corpus manifest.")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--schema", type=Path, default=REPO_ROOT / "configs/tokenizer/corpus-manifest.schema.yaml")
+    parser.add_argument("--storage-config", type=Path, default=REPO_ROOT / "configs/data/runpod-storage-v0.yaml")
+    parser.add_argument("--probe-storage", action="store_true")
     args = parser.parse_args()
+
+    if "cloud-storage-v0" in args.storage_config.as_posix():
+        print("cloud-storage-v0.yaml is retired; use runpod-storage-v0.yaml", file=sys.stderr)
+        return 1
 
     manifest = load_yaml(args.manifest)
     schema = load_schema(args.schema)
-    errors = validate_corpus_manifest(manifest, schema)
+    storage_config = load_yaml(args.storage_config)
+    errors = validate_corpus_manifest(
+        manifest,
+        schema,
+        storage_config=storage_config,
+        probe_cloud=args.probe_storage,
+    )
     if errors:
         print("corpus manifest validation failed:", file=sys.stderr)
         for error in errors:

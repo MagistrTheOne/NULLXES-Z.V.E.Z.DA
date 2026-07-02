@@ -1,13 +1,2 @@
-datasets
-datatrove
-pyarrow
-polars
-duckdb
-xxhash
-datasketch
-fasttext-wheel
-presidio-analyzer
-presidio-anonymizer
-zstandard
-orjson
 pyyaml
+orjson

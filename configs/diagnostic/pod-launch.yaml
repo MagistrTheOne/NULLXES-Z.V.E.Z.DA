@@ -1,0 +1,80 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+revision: "0.7-runpod-only"
+purpose: dense_15b_init_and_smoke_train
+pretrain_claim: false
+
+pod:
+  provider: runpod
+  gpu: H200_SXM
+  gpu_count: 8
+  image_note: "Use CUDA/PyTorch/TE container; inherit exact pins from image manifest."
+
+paths:
+  repo_root: /workspace/NULLXES-Z.V.E.Z.D.A
+  workspace: /workspace/zvezda
+  corpus_root: /workspace/corpus
+  tokenizer_bundle_dir: /workspace/zvezda/artifacts/tokenizer
+  init_checkpoint_dir: /workspace/zvezda/artifacts/init/zvezda-15b-dense
+  smoke_output_dir: /workspace/zvezda/artifacts/smoke/zvezda-15b-dense
+
+configs:
+  model: configs/zvezda-15b-dense.yaml
+  tokenizer: configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml
+  init_policy: configs/init/init-policy-v0.yaml
+  init_curriculum: configs/data/init-curriculum-v1.yaml
+  storage: configs/data/runpod-storage-v0.yaml
+  corpus_manifest: configs/tokenizer/corpus-manifest.yaml
+  parallelism: configs/parallelism-h200-diagnostic.yaml
+
+global_seed: 20260703
+
+phases:
+  - name: preflight
+    command: python scripts/pod_preflight.py --launch configs/diagnostic/pod-launch.yaml --probe-storage
+  - name: preflight_train
+    command: python scripts/pod_preflight.py --launch configs/diagnostic/pod-launch.yaml --probe-storage --require-artifacts
+  - name: tokenizer_train
+    skip_if_exists: /workspace/zvezda/artifacts/tokenizer/tokenizer.json
+    command: >
+      python scripts/train_tokenizer.py
+      --config configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml
+      --corpus-manifest configs/tokenizer/corpus-manifest.yaml
+      --storage-config configs/data/runpod-storage-v0.yaml
+      --output-dir /workspace/zvezda/artifacts/tokenizer
+      --probe-storage
+  - name: init_checkpoint
+    command: >
+      python scripts/init_checkpoint.py
+      --config configs/zvezda-15b-dense.yaml
+      --init-policy configs/init/init-policy-v0.yaml
+      --output-dir /workspace/zvezda/artifacts/init/zvezda-15b-dense
+      --global-seed 20260703
+      --shard-count 8
+  - name: smoke_train
+    depends_on: preflight_train
+    command: >
+      torchrun --nproc_per_node=8 scripts/smoke_train.py
+      --launch configs/diagnostic/pod-launch.yaml
+
+smoke_train:
+  max_steps: 1000
+  seq_len: 2048
+  log_every: 10
+  save_every: 500
+  mtp_weight: 0.2
+  max_grad_norm: 1.0
+
+stop_rules:
+  loss_must_decrease: true
+  max_grad_norm_spike: 1000.0
+  require_checkpoint_roundtrip: true
+  no_pretrain_claim: true
+  no_stubs: true
+
+notes:
+  - Launch provider: RunPod only. No AWS credentials or s3:// URIs.
+  - Corpus URIs: runpod://<volume-relative-path> only (network volume).
+  - VK/Yandex: internal reference only (storage-providers-internal.yaml), not active.
+  - Placeholder hashes or template URIs fail validation (stubs = fail).
+  - MoE diagnostic starts only after dense smoke gates pass.

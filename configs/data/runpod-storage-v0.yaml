@@ -1,0 +1,40 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+policy_name: runpod_storage_v0
+launch_provider: runpod
+internal_reference_only: configs/data/storage-providers-internal.yaml
+
+storage_policy:
+  launch_provider: runpod
+  cloud_only: true
+  local_machine_paths_allowed: false
+  aws_allowed: false
+  runpod_s3_allowed: false
+  pod_cache_dir: /workspace/zvezda/cache
+  allowed_schemes:
+    - runpod
+
+providers:
+  runpod:
+    driver: runpod_volume
+    description: "RunPod network volume — persistent corpus on pod storage."
+    volume_root_env: RUNPOD_VOLUME_ROOT
+    default_volume_root: /workspace
+    required_on_pod: true
+
+preflight:
+  require_runpod_pod: true
+  runpod_env_any:
+    - RUNPOD_POD_ID
+    - RUNPOD_POD_HOSTNAME
+  probe_read_bytes: 4096
+  reject_uri_schemes:
+    - file
+    - ""
+    - s3
+    - gs
+    - r2
+    - https
+    - runpod-s3
+  reject_aws_credentials: true
+  no_stubs: true

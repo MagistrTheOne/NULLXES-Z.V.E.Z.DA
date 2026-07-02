@@ -1,5 +1,9 @@
 schema_version: 1
 program: Z.V.E.Z.D.A
-purpose: diagnostic_tokenizer_training
+purpose: runpod_init_curriculum
+storage_policy: runpod_only
+launch_provider: runpod
 no_mock_data: true
+no_stubs: true
+
 files: []

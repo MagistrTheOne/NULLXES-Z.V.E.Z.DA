@@ -1,0 +1,33 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+purpose: internal_reference_not_for_launch
+launch_status: not_active
+
+note: >
+  VK Cloud and Yandex Cloud object storage are documented for future expansion only.
+  Current Z.V.E.Z.D.A pod launch uses RunPod exclusively (see runpod-storage-v0.yaml).
+  No AWS. No activation without operator gate.
+
+providers:
+  vk_cloud:
+    status: reference_only
+    driver: s3fs
+    endpoint_env: VK_S3_ENDPOINT
+    credentials_env:
+      - VK_S3_ACCESS_KEY
+      - VK_S3_SECRET_KEY
+    uri_scheme: vk-s3
+
+  yandex_cloud:
+    status: reference_only
+    driver: s3fs
+    endpoint_env: YC_S3_ENDPOINT
+    credentials_env:
+      - YC_S3_ACCESS_KEY
+      - YC_S3_SECRET_KEY
+    uri_scheme: yc-s3
+
+activation_gate:
+  required_operator_approval: true
+  requires_new_storage_config_revision: true
+  not_compatible_with_current_pod_launch: true

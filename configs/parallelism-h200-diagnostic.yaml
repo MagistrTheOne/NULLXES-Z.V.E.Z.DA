@@ -1,0 +1,47 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+revision: "0.6-cloud-pod-diagnostic"
+
+hardware:
+  provider: runpod
+  gpu: H200_SXM
+  gpus_per_pod: 8
+  launch_only: true
+  hbm_per_gpu_gb: 141
+  local_execution_allowed: false
+
+parallelism:
+  tensor_parallel: 2
+  pipeline_parallel: 1
+  data_parallel: 4
+  context_parallel: 1
+  expert_parallel: 1
+  sequence_parallel: false
+  note: "Smoke path uses DDP; TP/EP profile reserved for MoE gate after dense smoke."
+
+precision:
+  transformer_engine: true
+  canonical_weights: bf16
+  quantized_runtime: fp8
+  master_weights: bf16
+  router: fp32
+  softmax: fp32
+  loss: fp32
+
+phases:
+  init_checkpoint:
+    min_gpus: 1
+    recommended_gpus: 3
+  smoke_train:
+    min_gpus: 8
+    recommended_gpus: 8
+
+storage:
+  launch_provider: runpod
+  aws_allowed: false
+  cloud_only: true
+  pod_workspace: /workspace/zvezda
+  pod_cache: /workspace/zvezda/cache
+  tokenizer_bundle: /workspace/zvezda/artifacts/tokenizer
+  init_checkpoint: /workspace/zvezda/artifacts/init
+  smoke_output: /workspace/zvezda/artifacts/smoke

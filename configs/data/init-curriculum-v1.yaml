@@ -1,0 +1,61 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+revision: "0.7-runpod-only"
+purpose: verified_init_and_smoke_train
+pretrain_claim: false
+launch_provider: runpod
+storage_policy: runpod_only
+
+token_target:
+  smoke_train_tokens_min: 10000000
+  smoke_train_tokens_max: 500000000
+  init_curriculum_cap_tokens: 500000000
+  synthetic_hard_cap: 0.10
+  synthetic_initial_target: 0.10
+
+segments:
+  ru_curated:
+    target_share: 0.25
+    description: "Books, legal, technical docs, internal NULLXES texts — no web crawl."
+    accepted_tokens: 0
+  code_verified:
+    target_share: 0.25
+    description: "Licensed repos with compile/test verifier gate."
+    accepted_tokens: 0
+  math_formal:
+    target_share: 0.15
+    description: "Problems with verifiable answers."
+    accepted_tokens: 0
+  tool_action_traces:
+    target_share: 0.20
+    description: "Real agent traces: state, action, observation."
+    accepted_tokens: 0
+  synthetic_verified:
+    target_share: 0.10
+    description: "Procedural generation with hard verifier only."
+    accepted_tokens: 0
+  heldout_gate:
+    target_share: 0.05
+    description: "Frozen regression eval — never in train."
+    accepted_tokens: 0
+
+gates:
+  source_license_required: true
+  source_hash_required: true
+  cloud_uri_required: true
+  runpod_only: true
+  local_paths_allowed: false
+  exact_dedup_required: true
+  minhash_dedup_required: true
+  pii_scrub_required: true
+  verifier_pass_required: true
+  tokenizer_fertility_required: true
+  no_mock_data: true
+  no_unverified_synthetic: true
+  no_web_crawl: true
+
+storage:
+  config: configs/data/runpod-storage-v0.yaml
+  internal_reference: configs/data/storage-providers-internal.yaml
+  corpus_manifest: configs/tokenizer/corpus-manifest.yaml
+  launch_provider: runpod

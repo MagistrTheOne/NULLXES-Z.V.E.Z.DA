@@ -1,0 +1,6 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+policy_name: cloud_only_corpus_v0
+deprecated: true
+superseded_by: configs/data/runpod-storage-v0.yaml
+note: "Retired. AWS/R2/GCS not used. RunPod-only launch."

@@ -2,26 +2,29 @@ schema_version: 1
 required_fields:
   - schema_version
   - program
+  - storage_policy
   - files
+
+storage_policy:
+  launch_provider: runpod
+  runpod_only: true
 
 file_entry_required_fields:
   - segment
-  - path
+  - uri
   - license
   - content_hash
 
 allowed_segments:
-  - russian_high_quality
-  - english_web
-  - code
-  - stem_math
-  - multilingual_non_ru_en
-  - tool_action_state
-  - heldout_validation
+  - ru_curated
+  - code_verified
+  - math_formal
+  - tool_action_traces
+  - synthetic_verified
+  - heldout_gate
 
 report_segments:
   - ru_clean
-  - en_clean
   - code_python
   - code_typescript
   - code_rust
@@ -32,8 +35,8 @@ report_segments:
 
 validation_rules:
   files_must_be_non_empty: true
-  paths_must_exist: true
-  paths_must_be_files: true
+  cloud_uri_required: true
+  local_paths_allowed: false
   segment_must_be_allowed: true
   license_must_not_be_unknown: true
   content_hash_algorithm:
@@ -41,3 +44,4 @@ validation_rules:
     - blake3
   no_duplicate_paths: true
   no_mock_data: true
+  no_stubs: true

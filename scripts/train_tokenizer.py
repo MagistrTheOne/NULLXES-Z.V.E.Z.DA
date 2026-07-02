@@ -11,7 +11,7 @@ if str(REPO_ROOT) not in sys.path:
 import yaml  # pyright: ignore[reportMissingModuleSource]
 
 from zvezda.tokenizer.gates import load_fertility_report, validate_gates
-from zvezda.tokenizer.manifest import load_corpus_manifest, load_schema, validate_corpus_manifest
+from zvezda.tokenizer.manifest import load_corpus_manifest
 from zvezda.tokenizer.trainer import fertility_report, save_outputs, train_tokenizer
 
 
@@ -24,19 +24,31 @@ def load_yaml(path: Path) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Train the Z.V.E.Z.D.A BPE tokenizer on a real corpus manifest.")
+    parser = argparse.ArgumentParser(description="Train the Z.V.E.Z.D.A BPE tokenizer from RunPod storage.")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--corpus-manifest", type=Path, required=True)
     parser.add_argument("--manifest-schema", type=Path, default=REPO_ROOT / "configs/tokenizer/corpus-manifest.schema.yaml")
+    parser.add_argument("--storage-config", type=Path, default=REPO_ROOT / "configs/data/runpod-storage-v0.yaml")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--baseline-fertility-report", type=Path, default=None)
+    parser.add_argument("--probe-storage", action="store_true")
     parser.add_argument("--skip-gates", action="store_true")
     args = parser.parse_args()
 
+    if "cloud-storage-v0" in args.storage_config.as_posix():
+        print("cloud-storage-v0.yaml is retired; use runpod-storage-v0.yaml", file=sys.stderr)
+        return 1
+
     config = load_yaml(args.config)
-    corpus_files = load_corpus_manifest(args.corpus_manifest, schema_path=args.manifest_schema)
-    tokenizer = train_tokenizer(config, corpus_files)
-    report = fertility_report(tokenizer, corpus_files, config=config)
+    storage_config = load_yaml(args.storage_config)
+    corpus_files = load_corpus_manifest(
+        args.corpus_manifest,
+        schema_path=args.manifest_schema,
+        storage_config=storage_config,
+        probe_cloud=args.probe_storage,
+    )
+    tokenizer = train_tokenizer(config, corpus_files, storage_config)
+    report = fertility_report(tokenizer, corpus_files, config=config, storage_config=storage_config)
     save_outputs(tokenizer, args.output_dir, report, config=config, repo_root=REPO_ROOT)
 
     if not args.skip_gates:

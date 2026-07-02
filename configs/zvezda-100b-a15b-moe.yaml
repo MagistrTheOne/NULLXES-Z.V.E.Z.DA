@@ -13,6 +13,14 @@ tokenizer:
   bundle_dir: null
   shared_with: configs/zvezda-15b-dense.yaml
 
+data:
+  curriculum: configs/data/init-curriculum-v1.yaml
+  storage: configs/data/runpod-storage-v0.yaml
+  storage_internal_reference: configs/data/storage-providers-internal.yaml
+  corpus_manifest: configs/tokenizer/corpus-manifest.yaml
+  storage_policy: runpod_only
+  launch_provider: runpod
+
 model:
   name: zvezda-100b-a15b-moe
   class: decoder_only_causal_moe
