@@ -1,0 +1,9 @@
+tokenizers
+datasets
+pyarrow
+polars
+orjson
+zstandard
+xxhash
+regex
+pyyaml

@@ -1,0 +1,96 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+purpose: source_backed_architecture_inputs
+rules:
+  no_unmeasured_claims: true
+  disabled_research_bets_require_gate: true
+
+sources:
+  deepseek_v3:
+    source: "https://arxiv.org/pdf/2412.19437"
+    total_parameters: 671000000000
+    active_parameters: 37000000000
+    evidence:
+      - mla_for_inference_efficiency
+      - deepseek_moe_for_training_efficiency
+      - auxiliary_loss_free_load_balancing
+      - multi_token_prediction_objective
+      - pretrained_on_14_8t_tokens
+    adopted:
+      - auxiliary_loss_free_load_balancing
+      - mtp_objective
+    not_adopted_initially:
+      - mla
+
+  qwen3_next:
+    source: "https://developer.nvidia.com/blog/new-open-source-qwen3-next-models-preview-hybrid-moe-architecture-delivering-improved-accuracy-and-accelerated-parallel-processing-across-nvidia-platform/"
+    total_parameters: 80000000000
+    active_parameters: 3000000000
+    layers: 48
+    routed_experts: 512
+    active_experts: 10
+    shared_experts: 1
+    hybrid_ratio: "3 linear_attention : 1 full_attention"
+    evidence:
+      - gated_deltanet_hybrid_attention
+      - high_sparsity_moe
+      - mtp
+    adopted:
+      - high_sparsity_moe_direction
+      - mtp
+    not_adopted_initially:
+      - gated_deltanet
+
+  mimo_v2_5_pro:
+    source: "https://huggingface.co/XiaomiMiMo/MiMo-V2.5-Pro"
+    total_parameters: 1020000000000
+    active_parameters: 42000000000
+    layers: 70
+    dense_layers: 1
+    moe_layers: 69
+    hidden_size: 6144
+    routed_experts: 384
+    active_experts: 8
+    moe_intermediate_size: 2048
+    dense_intermediate_size: 16384
+    attention: "SWA/GA 6:1, SWA window 128"
+    mtp_layers: 3
+    precision: "FP8 E4M3 mixed"
+    evidence:
+      - native_mtp_3
+      - swa_global_hybrid_attention
+      - fp8_mixed_precision
+      - 27t_pretraining_tokens
+    adopted:
+      - swa_global_hybrid_attention
+      - mtp_3
+      - fp8_path
+
+  glm_5_2:
+    source: "https://huggingface.co/zai-org/GLM-5.2"
+    total_parameters: 753000000000
+    active_parameters: 40000000000
+    layers: 78
+    hidden_size: 6144
+    routed_experts: 256
+    active_experts: 8
+    shared_experts: 1
+    context_length: 1048576
+    evidence:
+      - indexshare_sparse_attention
+      - mtp
+      - moe
+    adopted:
+      - active_experts_8
+      - shared_expert
+    not_adopted_initially:
+      - indexshare
+
+selected_baseline:
+  first_target: zvezda-125b-v2
+  scale_target: zvezda-300b-v2
+  rationale:
+    - "SWA/GA is lower kernel risk than DeltaNet/Mamba for first production path."
+    - "Top-8 routing matches MiMo/GLM evidence better than current top-4."
+    - "MTP depth 3 matches MiMo evidence and is isolated in accounting."
+    - "Tokenizer vocab 152576 follows MiMo/Qwen-style agent-code tokenizer scale."

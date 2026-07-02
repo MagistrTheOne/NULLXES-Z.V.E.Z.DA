@@ -1,2 +1,7 @@
-# P0 spec-only repository.
-# Runtime/training dependencies are intentionally not pinned until production code is added.
+# Z.V.E.Z.D.A dependency entrypoint.
+# Exact CUDA/PyTorch/Transformer-Engine pins must be inherited from the selected container image.
+-r requirements/requirements-tokenizer.txt
+-r requirements/requirements-data.txt
+-r requirements/requirements-train.txt
+-r requirements/requirements-infer.txt
+-r requirements/requirements-dev.txt

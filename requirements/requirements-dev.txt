@@ -1,0 +1,6 @@
+ruff
+mypy
+pytest
+pytest-xdist
+pyyaml
+types-PyYAML

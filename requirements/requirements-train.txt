@@ -1,0 +1,11 @@
+# Pin exact versions from the selected CUDA/PyTorch/Transformer-Engine container.
+torch
+megatron-core
+transformer-engine[pytorch]
+flash-attn
+numpy
+pyyaml
+orjson
+safetensors
+tensorboard
+wandb

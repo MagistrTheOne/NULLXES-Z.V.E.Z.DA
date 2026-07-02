@@ -22,14 +22,14 @@ dist/
 htmlcov/
 
 # Training artifacts: never commit generated model/data state by accident.
-checkpoints/
-ckpts/
-runs/
-wandb/
-tensorboard/
-data/
-datasets/
-shards/
+/checkpoints/
+/ckpts/
+/runs/
+/wandb/
+/tensorboard/
+/data/
+/datasets/
+/shards/
 *.safetensors
 *.pt
 *.pth

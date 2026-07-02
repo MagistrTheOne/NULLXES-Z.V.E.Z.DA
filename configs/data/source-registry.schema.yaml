@@ -1,0 +1,38 @@
+schema_version: 1
+required_source_fields:
+  - source_id
+  - status
+  - segment
+  - license
+  - origin_url
+  - snapshot_date
+  - raw_size_bytes
+  - estimated_tokens
+  - language
+  - domain
+  - content_hash
+  - dedup
+  - pii_scrub
+  - quality_filter
+  - tokenizer_fertility
+
+allowed_status:
+  - candidate
+  - accepted
+  - rejected
+
+accepted_requirements:
+  license:
+    allow_unknown: false
+  content_hash:
+    algorithms:
+      - sha256
+      - blake3
+  dedup:
+    exact_required: true
+    minhash_required: true
+  pii_scrub:
+    required: true
+  tokenizer_fertility:
+    required: true
+  rejected_reason_required_for_rejected: true

@@ -1,0 +1,96 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+policy_name: deterministic_bf16_streaming_init_v0
+
+canonical_checkpoint:
+  dtype: bf16
+  optimizer_state: false
+  fp8_artifact_is_derivative: true
+  streaming_write_required: true
+  keep_full_model_in_host_memory: false
+  keep_full_model_in_gpu_memory: false
+
+global_seed:
+  required: true
+  seed_source: launch_manifest
+  tensor_seed_derivation: "sha256(global_seed, model_name, tensor_name, layer_id, expert_id, shard_id)"
+
+tensor_init:
+  embeddings:
+    distribution: normal
+    std: 0.02
+    mean: 0.0
+  attention_qkv:
+    distribution: normal
+    std_formula: "0.02 / sqrt(2 * num_layers)"
+    mean: 0.0
+  attention_output:
+    distribution: normal
+    std_formula: "0.02 / sqrt(2 * num_layers)"
+    mean: 0.0
+  dense_swiglu:
+    gate_proj:
+      distribution: normal
+      std_formula: "0.02 / sqrt(2 * num_layers)"
+    up_proj:
+      distribution: normal
+      std_formula: "0.02 / sqrt(2 * num_layers)"
+    down_proj:
+      distribution: normal
+      std_formula: "0.02 / sqrt(2 * num_layers)"
+  moe_experts:
+    gate_proj:
+      distribution: normal
+      std_formula: "0.02 / sqrt(2 * num_layers)"
+    up_proj:
+      distribution: normal
+      std_formula: "0.02 / sqrt(2 * num_layers)"
+    down_proj:
+      distribution: normal
+      std_formula: "0.02 / sqrt(2 * num_layers)"
+    seed_must_include:
+      - layer_id
+      - expert_id
+      - tensor_name
+  router:
+    weight:
+      dtype: fp32
+      distribution: normal
+      std: 0.001
+    load_balance_bias:
+      dtype: fp32
+      trainable: false
+      initial_value: 0.0
+      update_rule: aux_loss_free_bias_update
+  rmsnorm:
+    weight_initial_value: 1.0
+  mtp:
+    projection:
+      distribution: normal
+      std_formula: "0.02 / sqrt(2 * num_layers)"
+    norm:
+      weight_initial_value: 1.0
+
+checkpoint_manifest:
+  required_fields:
+    - model_config_sha256
+    - tokenizer_config_sha256
+    - init_policy_sha256
+    - global_seed
+    - tensor_name
+    - tensor_shape
+    - tensor_dtype
+    - tensor_init_rule
+    - tensor_sha256
+    - shard_id
+    - shard_count
+  reject_if_missing: true
+
+validation:
+  required_checks:
+    - config_accounting_matches
+    - tensor_shapes_match_config
+    - no_nan_no_inf
+    - tensor_manifest_complete
+    - checkpoint_roundtrip_load
+    - fp8_derivative_not_marked_canonical

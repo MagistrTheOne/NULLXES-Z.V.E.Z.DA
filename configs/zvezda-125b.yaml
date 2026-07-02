@@ -1,0 +1,158 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+document: RD-2026-001
+revision: "0.3"
+owner:
+  organization: NULLXES
+  contact: ceo@nullxes.com
+  operator: MagistrTheOne
+
+model:
+  name: zvezda-125b
+  class: decoder_only_causal_moe
+  parameter_accounting:
+    total_parameters: 122567567360
+    active_parameters_per_token_training_lm_mtp: 10445021440
+    active_parameters_per_token_transformer_body: 9102844160
+    counting_rule: "LM-head compute included in active_parameters_per_token_training_lm_mtp; input/output embeddings excluded in transformer_body."
+
+  dimensions:
+    num_layers: 48
+    dense_prefix_layers: 4
+    moe_layers: 44
+    hidden_size: 5120
+    vocab_size: 131072
+    tie_embeddings: false
+
+  normalization:
+    type: rmsnorm
+    placement: prenorm
+    eps: 1.0e-6
+    bias: false
+
+  attention:
+    type: grouped_query_attention
+    num_attention_heads: 40
+    num_kv_heads: 8
+    head_dim: 128
+    qkv_bias: false
+    out_bias: false
+    local_window: 4096
+    context_length: 32768
+    layer_pattern:
+      period: 4
+      layers:
+        - sliding_window
+        - sliding_window
+        - sliding_window
+        - full
+    position:
+      local_layers: rope
+      full_layers: extended_rope
+      rope_theta: 1000000
+
+  dense_prefix_ffn:
+    type: swiglu
+    hidden_size: 13824
+    bias: false
+    layers: [0, 1, 2, 3]
+
+  moe:
+    enabled_from_layer: 4
+    routed_experts: 112
+    shared_experts: 1
+    expert_hidden_size: 1536
+    routed_top_k: 4
+    router:
+      scoring: normalized_sigmoid
+      precision: fp32
+      bias_update: aux_loss_free
+      aux_loss: disabled
+    capacity:
+      token_drop_policy: strict_alert
+      skipped_tokens_alert_threshold: 0.05
+    metrics:
+      - tokens_per_expert
+      - router_entropy
+      - expert_utilization
+      - skipped_tokens
+
+  mtp:
+    enabled: true
+    depth: 1
+    extra_parameters: 26219520
+    loss_weight: null
+    note: "Loss weight must be set in the launch manifest, not guessed in this config."
+
+  research_bets:
+    ssm_interleave:
+      enabled: false
+      candidate: mamba2
+      gate: "Throughput +15% at equal quality and no long-context regression."
+    l2_learned_memory:
+      enabled: false
+      gate: "Long-horizon eval improvement over L1/L3 baseline with no perplexity regression >1%."
+    latent_recurrent_reasoning:
+      enabled: false
+      gate: "Reasoning eval delta at equal train FLOPs against depth-equivalent baseline."
+    action_token_space:
+      enabled: false
+      gate: "Agentic environment success delta and no language-regression gate failure."
+    machine_state_modality:
+      enabled: false
+      gate: "State-grounded eval gain and no training instability."
+
+training_precision:
+  target_gpu: H200_SXM
+  transformer_engine: true
+  weights: fp8
+  activations: fp8
+  router: fp32
+  softmax: fp32
+  loss: fp32
+  master_weights: bf16
+
+kv_cache:
+  context_length: 32768
+  elements_per_token_per_layer: 2048
+  elements_per_token_all_layers: 98304
+  elements_per_sequence_all_layers: 3221225472
+  fp8_bytes_per_sequence: 3221225472
+  fp8_gib_per_sequence: 3.00
+  bf16_bytes_per_sequence: 6442450944
+  bf16_gib_per_sequence: 6.00
+
+parameter_breakdown:
+  attention: 3019898880
+  dense_prefix_ffn: 849346560
+  moe_layers: 117329428480
+  input_output_embeddings: 1342177280
+  mtp: 26219520
+  rmsnorm_scales: 496640
+  total: 122567567360
+
+active_parameter_breakdown:
+  attention: 3019898880
+  dense_prefix_ffn: 849346560
+  active_moe: 5206882560
+  input_output_embeddings_and_lm_head: 1342177280
+  mtp: 26219520
+  rmsnorm_scales: 496640
+  total_training_lm_mtp: 10445021440
+  transformer_body: 9102844160
+
+parameter_derivation:
+  d_model: 5120
+  d_kv: 1024
+  per_layer_attention: 62914560
+  per_dense_ffn_layer: 212336640
+  per_expert: 23592960
+  per_moe_layer_total: 2666577920
+  per_moe_layer_active: 118338240
+  input_embedding: 671088640
+  output_head: 671088640
+
+data_constraints:
+  synthetic_hard_cap: 0.35
+  no_mock_data: true
+  require_dataset_version_hash: true

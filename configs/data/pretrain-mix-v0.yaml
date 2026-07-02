@@ -1,0 +1,41 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+mix_name: pretrain-mix-v0
+token_target:
+  first_large_phase_tokens_min: 15000000000000
+  first_large_phase_tokens_max: 30000000000000
+  synthetic_hard_cap: 0.35
+  synthetic_initial_target: 0.05
+
+segments:
+  filtered_multilingual_web:
+    target_share: 0.35
+    accepted_tokens: 0
+  code:
+    target_share: 0.22
+    accepted_tokens: 0
+  stem_math_papers:
+    target_share: 0.15
+    accepted_tokens: 0
+  russian_high_quality:
+    target_share: 0.15
+    accepted_tokens: 0
+  books_docs_reference:
+    target_share: 0.05
+    accepted_tokens: 0
+  tool_action_traces:
+    target_share: 0.03
+    accepted_tokens: 0
+  verified_synthetic:
+    target_share: 0.05
+    accepted_tokens: 0
+
+gates:
+  source_license_required: true
+  source_hash_required: true
+  exact_dedup_required: true
+  minhash_dedup_required: true
+  pii_scrub_required: true
+  tokenizer_fertility_required: true
+  no_mock_data: true
+  no_unverified_synthetic: true

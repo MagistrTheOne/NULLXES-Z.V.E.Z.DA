@@ -1,0 +1,74 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+policy_name: pretrain_filter_policy_v0
+
+normalization:
+  unicode: nfkc
+  preserve_document_boundaries: true
+  reject_invalid_utf8: true
+
+language_id:
+  required: true
+  min_confidence: 0.80
+  keep_languages:
+    - ru
+    - en
+    - uk
+    - be
+    - de
+    - fr
+    - es
+    - zh
+    - ja
+    - ko
+    - code
+
+dedup:
+  exact:
+    hash: sha256
+    required: true
+  near:
+    method: minhash
+    required: true
+    jaccard_threshold: 0.80
+
+pii:
+  scrub_required: true
+  reject_unredacted_high_confidence_pii: true
+
+quality:
+  reject_empty: true
+  min_chars: 200
+  max_repeated_line_fraction: 0.30
+  max_control_char_fraction: 0.01
+  reject_boilerplate_heavy: true
+  reject_machine_translated_low_quality: true
+
+code:
+  license_allowlist_required: true
+  reject_generated_vendor_dirs: true
+  reject_minified_files: true
+  keep_extensions:
+    - py
+    - ts
+    - js
+    - rs
+    - cpp
+    - c
+    - h
+    - hpp
+    - go
+    - java
+    - kt
+    - swift
+    - cs
+    - sql
+    - sh
+    - md
+    - yaml
+    - json
+
+synthetic:
+  verifier_required: true
+  hard_cap_share: 0.35
+  initial_target_share: 0.05

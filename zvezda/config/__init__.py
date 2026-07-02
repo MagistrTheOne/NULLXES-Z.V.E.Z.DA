@@ -1,0 +1,1 @@
+"""Configuration accounting and validation."""

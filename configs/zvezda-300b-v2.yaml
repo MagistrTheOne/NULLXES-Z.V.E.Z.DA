@@ -1,0 +1,206 @@
+schema_version: 2
+program: Z.V.E.Z.D.A
+document: RD-2026-001
+revision: "0.4-architecture-v2"
+owner:
+  organization: NULLXES
+  contact: ceo@nullxes.com
+  operator: MagistrTheOne
+
+model:
+  name: zvezda-300b-v2
+  class: decoder_only_causal_moe
+  architecture_basis:
+    evidence_file: configs/architecture/evidence-2026.yaml
+    baseline: "MiMo-style SWA/GA MoE with DeepSeek-style aux-loss-free routing."
+  parameter_accounting:
+    total_parameters: 310059089920
+    active_parameters_per_token_training_lm_mtp: 16726245376
+    active_parameters_per_token_transformer_body: 15476342784
+    counting_rule: "LM-head compute included in active_parameters_per_token_training_lm_mtp; input/output embeddings excluded in transformer_body."
+
+  dimensions:
+    num_layers: 48
+    dense_prefix_layers: 1
+    moe_layers: 47
+    hidden_size: 4096
+    vocab_size: 152576
+    tie_embeddings: false
+
+  normalization:
+    type: rmsnorm
+    placement: prenorm
+    eps: 1.0e-6
+    bias: false
+
+  attention:
+    type: hybrid_swa_global_gqa
+    num_attention_heads: 64
+    num_kv_heads: 8
+    qk_head_dim: 192
+    v_head_dim: 128
+    head_dim: 128
+    qkv_bias: false
+    out_bias: false
+    local_window: 128
+    context_length: 32768
+    max_extension_context_length: 1048576
+    layer_pattern:
+      period: 7
+      layers:
+        - full
+        - sliding_window
+        - sliding_window
+        - sliding_window
+        - sliding_window
+        - sliding_window
+        - sliding_window
+    position:
+      local_layers: rope
+      full_layers: extended_rope
+      rope_theta: 10000000
+      partial_rotary_factor: 0.334
+    attention_sink_bias:
+      sliding_window: true
+      full: false
+
+  dense_prefix_ffn:
+    type: swiglu
+    hidden_size: 16384
+    bias: false
+    layers: [0]
+
+  moe:
+    enabled_from_layer: 1
+    routed_experts: 256
+    shared_experts: 1
+    expert_hidden_size: 2048
+    routed_top_k: 8
+    router:
+      scoring: normalized_sigmoid
+      precision: fp32
+      bias_update: aux_loss_free
+      aux_loss: disabled
+      sequence_balance_loss: minimal_gate_only
+    capacity:
+      token_drop_policy: strict_alert
+      skipped_tokens_alert_threshold: 0.05
+    metrics:
+      - tokens_per_expert
+      - router_entropy
+      - expert_utilization
+      - skipped_tokens
+      - per_sequence_expert_balance
+
+  mtp:
+    enabled: true
+    depth: 3
+    extra_parameters: 50343936
+    loss_weight: null
+    note: "MTP loss weight must be set in the launch manifest, not guessed in architecture config."
+
+  research_bets:
+    gated_deltanet_interleave:
+      enabled: false
+      gate: "Replace SWA layers only after throughput gain and long-context gates pass."
+    mla:
+      enabled: false
+      gate: "Enable only if KV-cache pressure dominates and kernels are production-ready."
+    indexshare_sparse_attention:
+      enabled: false
+      gate: "Enable only for context extension beyond 32768 after sparse retrieval gates."
+    l2_learned_memory:
+      enabled: false
+      gate: "Long-horizon eval improvement over L1/L3 baseline with no perplexity regression >1%."
+    action_token_space:
+      enabled: false
+      gate: "Agentic environment success delta and no language-regression gate failure."
+    machine_state_modality:
+      enabled: false
+      gate: "State-grounded eval gain and no training instability."
+
+training_precision:
+  target_gpu: B300_SXM
+  transformer_engine: true
+  weights: fp8
+  activations: fp8
+  router: fp32
+  softmax: fp32
+  loss: fp32
+  master_weights: bf16
+
+kv_cache:
+  context_length: 32768
+  elements_per_token_per_layer: 2560
+  elements_per_token_all_layers: 122880
+  elements_per_sequence_all_layers: 4026531840
+  fp8_bytes_per_sequence: 4026531840
+  fp8_gib_per_sequence: 3.75
+  bf16_bytes_per_sequence: 8053063680
+  bf16_gib_per_sequence: 7.50
+
+parameter_breakdown:
+  attention: 4529848320
+  dense_prefix_ffn: 201326592
+  moe_layers: 304027271168
+  input_output_embeddings: 1249902592
+  mtp: 50343936
+  rmsnorm_scales: 397312
+  total: 310059089920
+
+active_parameter_breakdown:
+  attention: 4529848320
+  dense_prefix_ffn: 201326592
+  active_moe: 10694426624
+  input_output_embeddings_and_lm_head: 1249902592
+  mtp: 50343936
+  rmsnorm_scales: 397312
+  total_training_lm_mtp: 16726245376
+  transformer_body: 15476342784
+
+parameter_derivation:
+  d_model: 4096
+  qk_width: 12288
+  v_width: 8192
+  per_layer_attention: 94371840
+  per_dense_ffn_layer: 201326592
+  per_expert: 25165824
+  per_moe_layer_total: 6468665344
+  per_moe_layer_active: 227540992
+  input_embedding: 624951296
+  output_head: 624951296
+
+persistent_memory_footprint:
+  parameter_count: 310059089920
+  fp8_model_copy:
+    bytes_per_parameter: 1
+    bytes: 310059089920
+    decimal_gb: 310.059
+    binary_gib: 288.765
+  bf16_master_weights:
+    bytes_per_parameter: 2
+    bytes: 620118179840
+    decimal_gb: 620.118
+    binary_gib: 577.530
+  fp32_adam_moments:
+    bytes_per_parameter: 8
+    bytes: 2480472719360
+    decimal_gb: 2480.473
+    binary_gib: 2310.121
+  fp8_plus_bf16_master_plus_adam_moments:
+    bytes_per_parameter: 11
+    bytes: 3410649989120
+    decimal_gb: 3410.650
+    binary_gib: 3176.416
+  excludes:
+    - gradients
+    - activations
+    - temporary_buffers
+    - nccl_buffers
+    - transformer_engine_amax_history
+    - checkpoint_staging
+
+data_constraints:
+  synthetic_hard_cap: 0.35
+  no_mock_data: true
+  require_dataset_version_hash: true
