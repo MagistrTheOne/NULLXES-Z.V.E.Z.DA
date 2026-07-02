@@ -69,7 +69,7 @@ def calculate(config: dict[str, Any]) -> Accounting:
     vocab_size = _require_int(config, "model.dimensions.vocab_size")
     num_layers = _require_int(config, "model.dimensions.num_layers")
     dense_prefix_layers = _require_int(config, "model.dimensions.dense_prefix_layers")
-    moe_layers = _require_int(config, "model.dimensions.moe_layers")
+    moe_layers = _optional_int(config, "model.dimensions.moe_layers", 0)
     if dense_prefix_layers + moe_layers != num_layers:
         raise ValueError("dense_prefix_layers + moe_layers must equal num_layers")
 
@@ -84,10 +84,10 @@ def calculate(config: dict[str, Any]) -> Accounting:
     context_length = _require_int(config, "model.attention.context_length")
 
     dense_ffn = _require_int(config, "model.dense_prefix_ffn.hidden_size")
-    routed_experts = _require_int(config, "model.moe.routed_experts")
-    shared_experts = _require_int(config, "model.moe.shared_experts")
-    expert_ffn = _require_int(config, "model.moe.expert_hidden_size")
-    routed_top_k = _require_int(config, "model.moe.routed_top_k")
+    routed_experts = _optional_int(config, "model.moe.routed_experts", 0)
+    shared_experts = _optional_int(config, "model.moe.shared_experts", 0)
+    expert_ffn = _optional_int(config, "model.moe.expert_hidden_size", 0)
+    routed_top_k = _optional_int(config, "model.moe.routed_top_k", 0)
     mtp_depth = _optional_int(config, "model.mtp.depth", 0)
 
     q_proj = d_model * num_heads * qk_head_dim
@@ -100,13 +100,16 @@ def calculate(config: dict[str, Any]) -> Accounting:
     per_dense_ffn = 3 * d_model * dense_ffn
     dense_prefix_ffn = per_dense_ffn * dense_prefix_layers
 
-    per_expert = 3 * d_model * expert_ffn
-    router = d_model * routed_experts
-    per_moe_layer_total = (routed_experts + shared_experts) * per_expert + router
-    moe_total = per_moe_layer_total * moe_layers
-
-    per_moe_layer_active = (routed_top_k + shared_experts) * per_expert + router
-    active_moe = per_moe_layer_active * moe_layers
+    if moe_layers:
+        per_expert = 3 * d_model * expert_ffn
+        router = d_model * routed_experts
+        per_moe_layer_total = (routed_experts + shared_experts) * per_expert + router
+        moe_total = per_moe_layer_total * moe_layers
+        per_moe_layer_active = (routed_top_k + shared_experts) * per_expert + router
+        active_moe = per_moe_layer_active * moe_layers
+    else:
+        moe_total = 0
+        active_moe = 0
 
     input_embedding = vocab_size * d_model
     output_head = vocab_size * d_model

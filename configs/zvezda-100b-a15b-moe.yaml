@@ -1,0 +1,176 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+document: RD-2026-001
+revision: "0.5-dense-vs-moe-diagnostic"
+owner:
+  organization: NULLXES
+  contact: ceo@nullxes.com
+  operator: MagistrTheOne
+
+model:
+  name: zvezda-100b-a15b-moe
+  class: decoder_only_causal_moe
+  purpose: sparse_vs_dense_learnability_diagnostic
+  pretrain_claim: false
+  parameter_accounting:
+    total_parameters: 100991160320
+    active_parameters_per_token_training_lm_mtp: 15238615040
+    active_parameters_per_token_transformer_body: 13676236800
+    counting_rule: "LM-head compute included in active training count; active MoE uses routed_top_k + shared_experts."
+
+  dimensions:
+    num_layers: 48
+    dense_prefix_layers: 1
+    moe_layers: 47
+    hidden_size: 5120
+    vocab_size: 152576
+    tie_embeddings: false
+
+  normalization:
+    type: rmsnorm
+    placement: prenorm
+    eps: 1.0e-6
+    bias: false
+
+  attention:
+    type: grouped_query_attention
+    num_attention_heads: 40
+    num_kv_heads: 8
+    head_dim: 128
+    qkv_bias: false
+    out_bias: false
+    local_window: 4096
+    context_length: 32768
+    layer_pattern:
+      period: 4
+      layers:
+        - sliding_window
+        - sliding_window
+        - sliding_window
+        - full
+    position:
+      local_layers: rope
+      full_layers: extended_rope
+      rope_theta: 1000000
+
+  dense_prefix_ffn:
+    type: swiglu
+    hidden_size: 13824
+    bias: false
+    layers: [0]
+
+  moe:
+    enabled_from_layer: 1
+    routed_experts: 64
+    shared_experts: 1
+    expert_hidden_size: 2048
+    routed_top_k: 6
+    diagnostic_note: "Top-6 is selected to keep active parameters close to the 15B dense diagnostic model; production v2 keeps top-8."
+    router:
+      scoring: normalized_sigmoid
+      precision: fp32
+      bias_update: aux_loss_free
+      aux_loss: disabled
+      sequence_balance_loss: minimal_gate_only
+    capacity:
+      token_drop_policy: strict_alert
+      skipped_tokens_alert_threshold: 0.05
+    metrics:
+      - tokens_per_expert
+      - router_entropy
+      - expert_utilization
+      - skipped_tokens
+      - per_sequence_expert_balance
+
+  mtp:
+    enabled: true
+    depth: 3
+    extra_parameters: 78658560
+    loss_weight: null
+    note: "MTP loss weight must be set in diagnostic launch manifest."
+
+training_precision:
+  target_gpu: H200_SXM
+  transformer_engine: true
+  canonical_weights: bf16
+  quantized_runtime: fp8
+  quantized_checkpoint_is_canonical: false
+  router: fp32
+  softmax: fp32
+  loss: fp32
+  master_weights: bf16
+
+kv_cache:
+  context_length: 32768
+  elements_per_token_per_layer: 2048
+  elements_per_token_all_layers: 98304
+  elements_per_sequence_all_layers: 3221225472
+  fp8_bytes_per_sequence: 3221225472
+  fp8_gib_per_sequence: 3.00
+  bf16_bytes_per_sequence: 6442450944
+  bf16_gib_per_sequence: 6.00
+
+parameter_breakdown:
+  attention: 3019898880
+  dense_prefix_ffn: 212336640
+  moe_layers: 96117391360
+  input_output_embeddings: 1562378240
+  mtp: 78658560
+  rmsnorm_scales: 496640
+  total: 100991160320
+
+active_parameter_breakdown:
+  attention: 3019898880
+  dense_prefix_ffn: 212336640
+  active_moe: 10364846080
+  input_output_embeddings_and_lm_head: 1562378240
+  mtp: 78658560
+  rmsnorm_scales: 496640
+  total_training_lm_mtp: 15238615040
+  transformer_body: 13676236800
+
+parameter_derivation:
+  d_model: 5120
+  d_kv: 1024
+  per_layer_attention: 62914560
+  per_dense_ffn_layer: 212336640
+  per_expert: 31457280
+  per_moe_layer_total: 2045050880
+  per_moe_layer_active: 220528640
+  input_embedding: 781189120
+  output_head: 781189120
+
+persistent_memory_footprint:
+  parameter_count: 100991160320
+  fp8_model_copy:
+    bytes_per_parameter: 1
+    bytes: 100991160320
+    decimal_gb: 100.991
+    binary_gib: 94.055
+  bf16_master_weights:
+    bytes_per_parameter: 2
+    bytes: 201982320640
+    decimal_gb: 201.982
+  fp32_adam_moments:
+    bytes_per_parameter: 8
+    bytes: 807929282560
+    decimal_gb: 807.929
+  fp8_plus_bf16_master_plus_adam_moments:
+    bytes_per_parameter: 11
+    bytes: 1110902763520
+    decimal_gb: 1110.903
+    binary_gib: 1034.609
+
+diagnostic_protocol:
+  objective: "Compare sparse MoE learnability against 15B dense under the same tokenizer, context, hidden size, and MTP depth."
+  not_pretraining: true
+  compare_against: configs/zvezda-15b-dense.yaml
+  required_outputs:
+    - tokenizer_fertility_report
+    - loss_curve_shape
+    - grad_norm_trace
+    - tokens_per_second
+    - router_entropy
+    - expert_utilization
+    - skipped_tokens
+    - checkpoint_roundtrip

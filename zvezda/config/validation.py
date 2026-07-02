@@ -39,7 +39,7 @@ def validate(config: dict[str, Any]) -> list[str]:
         # MiMo-style asymmetric QK/V heads intentionally do not make QK equal to hidden size.
         if num_heads * v_head_dim != 2 * d_model:
             errors.append("asymmetric attention geometry must explicitly justify output width")
-    if routed_top_k >= routed_experts:
+    if routed_experts is not None and routed_top_k is not None and routed_top_k >= routed_experts:
         errors.append("moe.routed_top_k must be smaller than moe.routed_experts")
 
     param_accounting = _get(config, "model.parameter_accounting", {})

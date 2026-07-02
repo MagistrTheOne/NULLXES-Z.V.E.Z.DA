@@ -1,0 +1,147 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+document: RD-2026-001
+revision: "0.5-dense-vs-moe-diagnostic"
+owner:
+  organization: NULLXES
+  contact: ceo@nullxes.com
+  operator: MagistrTheOne
+
+model:
+  name: zvezda-15b-dense
+  class: decoder_only_causal_dense
+  purpose: tokenizer_optimizer_diagnostic
+  pretrain_claim: false
+  parameter_accounting:
+    total_parameters: 14853591040
+    active_parameters_per_token_training_lm_mtp: 14853591040
+    active_parameters_per_token_transformer_body: 13291212800
+    counting_rule: "Dense model: all non-embedding transformer parameters are active; LM-head compute included in active training count."
+
+  dimensions:
+    num_layers: 48
+    dense_prefix_layers: 48
+    moe_layers: 0
+    hidden_size: 5120
+    vocab_size: 152576
+    tie_embeddings: false
+
+  normalization:
+    type: rmsnorm
+    placement: prenorm
+    eps: 1.0e-6
+    bias: false
+
+  attention:
+    type: grouped_query_attention
+    num_attention_heads: 40
+    num_kv_heads: 8
+    head_dim: 128
+    qkv_bias: false
+    out_bias: false
+    local_window: 4096
+    context_length: 32768
+    layer_pattern:
+      period: 4
+      layers:
+        - sliding_window
+        - sliding_window
+        - sliding_window
+        - full
+    position:
+      local_layers: rope
+      full_layers: extended_rope
+      rope_theta: 1000000
+
+  dense_prefix_ffn:
+    type: swiglu
+    hidden_size: 13824
+    bias: false
+    layers: all
+
+  mtp:
+    enabled: true
+    depth: 3
+    extra_parameters: 78658560
+    loss_weight: null
+    note: "MTP loss weight must be set in diagnostic launch manifest."
+
+training_precision:
+  target_gpu: H200_SXM
+  transformer_engine: true
+  canonical_weights: bf16
+  quantized_runtime: fp8
+  quantized_checkpoint_is_canonical: false
+  router: null
+  softmax: fp32
+  loss: fp32
+  master_weights: bf16
+
+kv_cache:
+  context_length: 32768
+  elements_per_token_per_layer: 2048
+  elements_per_token_all_layers: 98304
+  elements_per_sequence_all_layers: 3221225472
+  fp8_bytes_per_sequence: 3221225472
+  fp8_gib_per_sequence: 3.00
+  bf16_bytes_per_sequence: 6442450944
+  bf16_gib_per_sequence: 6.00
+
+parameter_breakdown:
+  attention: 3019898880
+  dense_prefix_ffn: 10192158720
+  moe_layers: 0
+  input_output_embeddings: 1562378240
+  mtp: 78658560
+  rmsnorm_scales: 496640
+  total: 14853591040
+
+active_parameter_breakdown:
+  attention: 3019898880
+  dense_prefix_ffn: 10192158720
+  active_moe: 0
+  input_output_embeddings_and_lm_head: 1562378240
+  mtp: 78658560
+  rmsnorm_scales: 496640
+  total_training_lm_mtp: 14853591040
+  transformer_body: 13291212800
+
+parameter_derivation:
+  d_model: 5120
+  d_kv: 1024
+  per_layer_attention: 62914560
+  per_dense_ffn_layer: 212336640
+  input_embedding: 781189120
+  output_head: 781189120
+
+persistent_memory_footprint:
+  parameter_count: 14853591040
+  fp8_model_copy:
+    bytes_per_parameter: 1
+    bytes: 14853591040
+    decimal_gb: 14.854
+    binary_gib: 13.833
+  bf16_master_weights:
+    bytes_per_parameter: 2
+    bytes: 29707182080
+    decimal_gb: 29.707
+  fp32_adam_moments:
+    bytes_per_parameter: 8
+    bytes: 118828728320
+    decimal_gb: 118.829
+  fp8_plus_bf16_master_plus_adam_moments:
+    bytes_per_parameter: 11
+    bytes: 163389501440
+    decimal_gb: 163.390
+    binary_gib: 152.168
+
+diagnostic_protocol:
+  objective: "Validate tokenizer fertility, optimizer behavior, loss curve shape, and dense baseline learnability."
+  not_pretraining: true
+  compare_against: configs/zvezda-100b-a15b-moe.yaml
+  required_outputs:
+    - tokenizer_fertility_report
+    - loss_curve_shape
+    - grad_norm_trace
+    - tokens_per_second
+    - checkpoint_roundtrip
