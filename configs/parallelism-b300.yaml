@@ -1,0 +1,73 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+document: RD-2026-001
+revision: "0.3"
+
+hardware:
+  gpu: B300_SXM
+  gpus_per_node: 8
+  nodes: 80
+  total_gpus: 640
+  hbm_per_gpu_gb: 288
+  nvlink_generation: 5
+  local_execution_allowed: false
+
+parallelism:
+  tensor_parallel: 4
+  pipeline_parallel: 10
+  context_parallel: 2
+  data_parallel: 8
+  expert_parallel: 8
+  sequence_parallel: true
+  virtual_pipeline_parallel: null
+
+identities:
+  world_size_non_expert: "TP * PP * CP * DP = 4 * 10 * 2 * 8 = 640"
+  expert_sharding: "routed_experts / EP = 160 / 8 = 20 experts per expert-parallel rank"
+  pipeline_layer_allocation: "60 layers / PP 10 = 6 layers per pipeline stage"
+
+moe:
+  routed_experts: 160
+  experts_per_ep_rank: 20
+  routed_top_k: 4
+  shared_experts_replicated: true
+  router_precision: fp32
+
+precision:
+  transformer_engine_fp8: true
+  router: fp32
+  softmax: fp32
+  loss: fp32
+  optimizer_states: fp32_adam_moments
+  master_weights: bf16
+  cpu_optimizer_offload: false
+
+checkpointing:
+  type: distributed
+  async_save: true
+  keep_rolling: 3
+  keep_eval_milestones: true
+  include:
+    - model
+    - optimizer
+    - scheduler
+    - data_iterator_state
+    - rng_state
+    - step
+    - full_config
+
+stop_rules:
+  loss_spike_running_median_multiplier: 2.0
+  loss_spike_sustained_steps: 100
+  grad_norm_nan_or_inf: stop
+  grad_norm_multiplier: 10.0
+  mfu_drop_sustained_fraction: 0.20
+  tokens_per_second_drop_sustained_fraction: 0.20
+  expert_single_utilization_sustained_max: 0.40
+  expert_low_utilization_fraction: 0.10
+  expert_low_utilization_threshold: 0.01
+  skipped_tokens_sustained_max: 0.05
+
+approval:
+  gpu_hours_above_requires_operator_confirmation: 500
+  operator: MagistrTheOne

@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.venv/
+venv/
+env/
+
+# Build and packaging
+build/
+dist/
+*.egg-info/
+
+# Logs and local state
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Training artifacts: never commit generated model/data state by accident.
+checkpoints/
+ckpts/
+runs/
+wandb/
+tensorboard/
+data/
+datasets/
+shards/
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.idx
+*.npy
+*.npz
+*.parquet
+
+# Secrets
+.env
+.env.*
+credentials.json
+secrets.*

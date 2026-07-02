@@ -1,0 +1,2 @@
+# P0 spec-only repository.
+# Runtime/training dependencies are intentionally not pinned until production code is added.
