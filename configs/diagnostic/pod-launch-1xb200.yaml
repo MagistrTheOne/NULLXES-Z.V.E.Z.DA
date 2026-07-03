@@ -32,6 +32,8 @@ configs:
 global_seed: 20260703
 
 phases:
+  - name: corpus_export
+    command: python scripts/export_hf_corpus.py --export configs/diagnostic/corpus-export-1xb200.yaml
   - name: preflight
     command: python scripts/pod_preflight.py --launch configs/diagnostic/pod-launch-1xb200.yaml --probe-storage
   - name: tokenizer_train
@@ -89,7 +91,7 @@ stop_rules:
 notes:
   - Launch provider: RunPod only. No AWS credentials or s3:// URIs.
   - Corpus URIs: runpod://<volume-relative-path> only (network volume).
-  - Purpose: pipeline smoke / survival profile — not production pretrain.
+  - Corpus export recipe: `configs/diagnostic/corpus-export-1xb200.yaml` (CPU ok; run before preflight).
   - 15B BF16 + optimizer on 1×B200 180GB is a high-risk survival smoke profile.
   - Keep seq_len=1024, micro_batch_size=1, activation checkpointing enabled.
   - Raise seq_len only after measured VRAM headroom (nvidia-smi after step 0).

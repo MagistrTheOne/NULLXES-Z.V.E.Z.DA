@@ -1,0 +1,38 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+revision: "1.0-b200-smoke-ru-classic"
+purpose: export_runpod_corpus_for_15b_dense_smoke
+pretrain_claim: false
+launch_provider: runpod
+no_web_crawl: true
+no_mock_data: true
+no_stubs: true
+
+paths:
+  repo_root: /workspace/NULLXES-Z.V.E.Z.D.A
+  corpus_root: /workspace/corpus
+  manifest_out: configs/tokenizer/corpus-manifest.yaml
+
+export:
+  shard_max_bytes: 33554432
+  max_total_bytes: 104857600
+  paragraph_separator: "\n\n"
+  flatten_paragraphs: true
+  write_manifest: true
+
+sources:
+  - id: ru_classic
+    segment: ru_curated
+    license: cc0-1.0
+    hf_repo: Imperius/ru-classic
+    hf_filename: corpus_clean.norm.txt
+    output_dir: init/ru_classic
+    output_prefix: part
+    note: "lib.ru classical prose, CC0; not web crawl."
+
+notes:
+  - Run on RunPod pod with network volume mounted at /workspace.
+  - GPU not required for corpus export; a CPU pod is enough for this step.
+  - After export, run 15B dense smoke on 1x B200 via pod-launch-1xb200.yaml — not B300.
+  - B300 is reserved for production v2 / MoE; out of scope for first dense smoke.
+  - Command: python scripts/export_hf_corpus.py --export configs/diagnostic/corpus-export-1xb200.yaml
