@@ -10,7 +10,7 @@ commands:
   train_tokenizer: python scripts/train_tokenizer.py --config configs/tokenizer/zvezda-bpe-152k-diagnostic.yaml --corpus-manifest configs/tokenizer/corpus-manifest.yaml --storage-config configs/data/runpod-storage-v0.yaml --output-dir /workspace/zvezda/artifacts/tokenizer --probe-storage
   pod_preflight: python scripts/pod_preflight.py --launch configs/diagnostic/pod-launch.yaml --probe-storage
   init_checkpoint: python scripts/init_checkpoint.py --config configs/zvezda-15b-dense.yaml --init-policy configs/init/init-policy-v0.yaml --output-dir /workspace/zvezda/artifacts/init/zvezda-15b-dense --global-seed 20260703
-  smoke_train: torchrun --nproc_per_node=8 scripts/smoke_train.py --launch configs/diagnostic/pod-launch.yaml
+  smoke_train: torchrun --nproc_per_node=2 scripts/smoke_train.py --launch configs/diagnostic/pod-launch.yaml
 
 notes:
   - RunPod only. Corpus on network volume via runpod:// paths.

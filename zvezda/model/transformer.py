@@ -69,7 +69,17 @@ class ZvezdaTransformer(nn.Module):
     def from_yaml_config(cls, config: dict) -> "ZvezdaTransformer":
         return cls(load_model_config(config))
 
-    def forward(self, input_ids: torch.Tensor) -> ModelOutput:
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        *,
+        mtp_weight: float | None = None,
+    ) -> ModelOutput | tuple[torch.Tensor, dict[str, float]]:
+        if mtp_weight is not None:
+            return self.loss(input_ids, mtp_weight=mtp_weight)
+        return self._forward_logits(input_ids)
+
+    def _forward_logits(self, input_ids: torch.Tensor) -> ModelOutput:
         batch, seq_len = input_ids.shape
         device = input_ids.device
         x = self.embed_tokens(input_ids)
@@ -89,7 +99,7 @@ class ZvezdaTransformer(nn.Module):
         *,
         mtp_weight: float = 0.2,
     ) -> tuple[torch.Tensor, dict[str, float]]:
-        out = self.forward(input_ids)
+        out = self._forward_logits(input_ids)
         shift_logits = out.logits[:, :-1, :].float()
         shift_labels = input_ids[:, 1:]
         lm_loss = F.cross_entropy(shift_logits.reshape(-1, shift_logits.size(-1)), shift_labels.reshape(-1))

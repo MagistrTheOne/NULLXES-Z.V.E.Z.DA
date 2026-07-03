@@ -1,14 +1,16 @@
 schema_version: 1
 program: Z.V.E.Z.D.A
-revision: "0.7-runpod-only"
-purpose: dense_15b_init_and_smoke_train
+revision: "1.0-b200-single-gpu-survival-smoke"
+purpose: single_gpu_survival_smoke
 pretrain_claim: false
 
 pod:
   provider: runpod
-  gpu: H200_SXM
-  gpu_count: 2
-  image_note: "Use CUDA/PyTorch container; smoke uses FSDP across gpu_count GPUs, not 8-way DDP."
+  gpu: B200_SXM
+  gpu_count: 1
+  hbm_per_gpu_gb: 180
+  image: runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
+  image_note: "B200 requires PyTorch 2.8+. Plain python smoke_train.py — no torchrun/DDP/FSDP."
 
 paths:
   repo_root: /workspace/NULLXES-Z.V.E.Z.D.A
@@ -25,13 +27,13 @@ configs:
   init_curriculum: configs/data/init-curriculum-v1.yaml
   storage: configs/data/runpod-storage-v0.yaml
   corpus_manifest: configs/tokenizer/corpus-manifest.yaml
-  parallelism: configs/parallelism-h200-diagnostic.yaml
+  parallelism: configs/parallelism-b200-diagnostic.yaml
 
 global_seed: 20260703
 
 phases:
   - name: preflight
-    command: python scripts/pod_preflight.py --launch configs/diagnostic/pod-launch.yaml --probe-storage
+    command: python scripts/pod_preflight.py --launch configs/diagnostic/pod-launch-1xb200.yaml --probe-storage
   - name: tokenizer_train
     skip_if_exists: /workspace/zvezda/artifacts/tokenizer/tokenizer.json
     command: >
@@ -54,20 +56,23 @@ phases:
     depends_on:
       - tokenizer_train
       - init_checkpoint
-    command: python scripts/pod_preflight.py --launch configs/diagnostic/pod-launch.yaml --probe-storage --require-artifacts
+    command: python scripts/pod_preflight.py --launch configs/diagnostic/pod-launch-1xb200.yaml --probe-storage --require-artifacts
   - name: smoke_train
     depends_on: preflight_train
     command: >
-      torchrun --nproc_per_node=2 scripts/smoke_train.py
-      --launch configs/diagnostic/pod-launch.yaml
+      python scripts/smoke_train.py
+      --launch configs/diagnostic/pod-launch-1xb200.yaml
 
 smoke_train:
   max_steps: 1000
-  seq_len: 2048
+  seq_len: 1024
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
   log_every: 10
   save_every: 500
-  mtp_weight: 0.2
+  mtp_weight: 0.0
   max_grad_norm: 1.0
+  activation_checkpointing: true
 
 stop_rules:
   loss_must_decrease: true
@@ -75,13 +80,21 @@ stop_rules:
   require_checkpoint_roundtrip: true
   no_pretrain_claim: true
   no_stubs: true
+  oom: fail
+  nan_inf_loss: fail
+  checkpoint_load_mismatch: fail
+  tokenizer_missing: fail
+  empty_corpus_manifest: fail
 
 notes:
   - Launch provider: RunPod only. No AWS credentials or s3:// URIs.
   - Corpus URIs: runpod://<volume-relative-path> only (network volume).
-  - Smoke train (2x H200 141 GB): FSDP via torchrun --nproc_per_node=2.
-  - Smoke train (1x B200 180 GB): use configs/diagnostic/pod-launch-1xb200.yaml.
+  - Purpose: pipeline smoke / survival profile — not production pretrain.
+  - 15B BF16 + optimizer on 1×B200 180GB is a high-risk survival smoke profile.
+  - Keep seq_len=1024, micro_batch_size=1, activation checkpointing enabled.
+  - Raise seq_len only after measured VRAM headroom (nvidia-smi after step 0).
+  - Do not use torchrun on this profile; gpu_count 1 = plain python smoke_train.py.
   - init_checkpoint --shard-count is safetensors file split on disk, not GPU count.
-  - VK/Yandex: internal reference only (storage-providers-internal.yaml), not active.
+  - skip_if_exists init marker: checkpoint_manifest.json (written by init_checkpoint.py).
+  - MoE / 100B / 125B v2 / 300B v2: out of scope for this launch.
   - Placeholder hashes or template URIs fail validation (stubs = fail).
-  - MoE diagnostic starts only after dense smoke gates pass.

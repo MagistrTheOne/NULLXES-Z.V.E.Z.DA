@@ -1,0 +1,51 @@
+schema_version: 1
+program: Z.V.E.Z.D.A
+revision: "1.0-b200-single-gpu-survival-smoke"
+
+hardware:
+  provider: runpod
+  gpu: B200_SXM
+  gpus_per_pod: 1
+  launch_only: true
+  hbm_per_gpu_gb: 180
+  local_execution_allowed: false
+
+parallelism:
+  distributed: false
+  world_size: 1
+  torchrun: false
+  ddp: false
+  fsdp: false
+  tensor_parallel: 1
+  pipeline_parallel: 1
+  data_parallel: 1
+  context_parallel: 1
+  expert_parallel: 1
+  zero_stage: 0
+  smoke:
+    strategy: single_gpu_activation_checkpointing
+    activation_checkpointing: true
+    note: "Plain python single-GPU smoke; no torchrun/DDP/FSDP."
+  production_pretrain:
+    note: "Reserved for full pretrain after dense smoke gates; not used in this launch."
+
+precision:
+  transformer_engine: false
+  canonical_weights: bf16
+  smoke_note: "Smoke uses native PyTorch BF16 + activation checkpointing; TE/FP8 is production path."
+
+phases:
+  init_checkpoint:
+    min_gpus: 0
+    recommended_gpus: 0
+    note: "CPU streaming write; GPU optional."
+  smoke_train:
+    min_gpus: 1
+    recommended_gpus: 1
+    min_hbm_per_gpu_gb: 180
+    note: "High-risk survival smoke: 15B BF16+Adam may OOM on 180 GB; seq_len=1024, micro_batch=1."
+
+storage:
+  launch_provider: runpod
+  aws_allowed: false
+  cloud_only: true

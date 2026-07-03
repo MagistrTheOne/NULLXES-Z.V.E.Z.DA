@@ -4,16 +4,26 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 import torch
 import torch.distributed as dist
 from safetensors.torch import load_file
+from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
+    CheckpointImpl,
+    apply_activation_checkpointing,
+    checkpoint_wrapper,
+)
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import MixedPrecision, ShardingStrategy
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 from torch.utils.data import DataLoader
 
-from zvezda.model.transformer import ZvezdaTransformer
+from zvezda.model.transformer import TransformerBlock, ZvezdaTransformer
 from zvezda.train.dataset import CloudTokenStream
+from zvezda.train.distributed import is_main_process, setup_smoke_distributed
 from zvezda.train.optimizer import OptimizerConfig, build_adamw, mup_lr
 
 
@@ -36,6 +46,30 @@ def _load_sharded_checkpoint(model: torch.nn.Module, checkpoint_dir: Path) -> No
         raise RuntimeError(f"checkpoint missing tensors: {missing}")
     if unexpected:
         raise RuntimeError(f"checkpoint has unexpected tensors: {unexpected}")
+
+
+def _wrap_smoke_model(model: ZvezdaTransformer, *, local_rank: int, world_size: int) -> torch.nn.Module:
+    apply_activation_checkpointing(
+        model,
+        checkpoint_wrapper_fn=partial(checkpoint_wrapper, checkpoint_impl=CheckpointImpl.NO_REENTRANT),
+        check_fn=lambda module: isinstance(module, TransformerBlock),
+    )
+    if world_size < 2:
+        return model.to(device=torch.device(f"cuda:{local_rank}"), dtype=torch.bfloat16)
+
+    auto_wrap_policy = partial(transformer_auto_wrap_policy, transformer_layer_cls={TransformerBlock})
+    return FSDP(
+        model,
+        auto_wrap_policy=auto_wrap_policy,
+        mixed_precision=MixedPrecision(
+            param_dtype=torch.bfloat16,
+            reduce_dtype=torch.bfloat16,
+            buffer_dtype=torch.bfloat16,
+        ),
+        sharding_strategy=ShardingStrategy.FULL_SHARD,
+        device_id=local_rank,
+        use_orig_params=True,
+    )
 
 
 def run_smoke_train(
@@ -63,20 +97,27 @@ def run_smoke_train(
         ),
     )
 
-    local_rank = int(torch.cuda.current_device()) if torch.cuda.is_available() else 0
-    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+    if not torch.cuda.is_available():
+        raise RuntimeError("smoke train requires CUDA")
 
-    model = ZvezdaTransformer.from_yaml_config(model_config).to(device=device, dtype=torch.bfloat16)
+    local_rank, world_size = setup_smoke_distributed()
+    expected_gpus = int(launch.get("pod", {}).get("gpu_count", world_size))
+    if world_size != expected_gpus:
+        launcher = (
+            "python scripts/smoke_train.py"
+            if expected_gpus == 1
+            else f"torchrun --nproc_per_node={expected_gpus} scripts/smoke_train.py"
+        )
+        raise RuntimeError(
+            f"smoke train expects {expected_gpus} GPU process(es) ({launcher}); got world_size={world_size}"
+        )
+
+    device = torch.device(f"cuda:{local_rank}")
+    model = ZvezdaTransformer.from_yaml_config(model_config)
     _load_sharded_checkpoint(model, checkpoint_dir)
+    model = _wrap_smoke_model(model, local_rank=local_rank, world_size=world_size)
 
-    if torch.cuda.device_count() > 1 and not dist.is_initialized():
-        dist.init_process_group(backend="nccl")
-    if dist.is_initialized():
-        from torch.nn.parallel import DistributedDataParallel as DDP
-
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
-
-    tokenizer_bundle = Path(launch["tokenizer_bundle_dir"])
+    tokenizer_bundle = Path(launch["paths"]["tokenizer_bundle_dir"])
     dataset = CloudTokenStream(
         corpus_files,
         tokenizer_bundle / "tokenizer.json",
@@ -101,13 +142,15 @@ def run_smoke_train(
 
         input_ids = batch.input_ids.to(device)
         optimizer.zero_grad(set_to_none=True)
-        raw_model = model.module if hasattr(model, "module") else model
-        loss, log = raw_model.loss(input_ids, mtp_weight=smoke.mtp_weight)
+        loss, log = model(input_ids, mtp_weight=smoke.mtp_weight)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), smoke.optimizer.max_grad_norm)
+        if isinstance(model, FSDP):
+            model.clip_grad_norm_(smoke.optimizer.max_grad_norm)
+        else:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), smoke.optimizer.max_grad_norm)
         optimizer.step()
 
-        if step % smoke.log_every == 0:
+        if step % smoke.log_every == 0 and is_main_process():
             entry = {"step": float(step), **log}
             metrics_log.append(entry)
             print(json.dumps(entry, sort_keys=True))
@@ -115,7 +158,14 @@ def run_smoke_train(
         step += 1
 
     trace_path = output_dir / "smoke_train_trace.json"
-    with trace_path.open("w", encoding="utf-8") as handle:
-        json.dump({"steps": metrics_log, "config": asdict(smoke)}, handle, indent=2, sort_keys=True)
-        handle.write("\n")
+    if is_main_process():
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with trace_path.open("w", encoding="utf-8") as handle:
+            json.dump({"steps": metrics_log, "config": asdict(smoke)}, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+
+    if dist.is_initialized():
+        dist.barrier()
+        dist.destroy_process_group()
+
     return {"trace": str(trace_path), "steps": step}
