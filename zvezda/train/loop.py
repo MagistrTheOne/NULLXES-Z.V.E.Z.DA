@@ -124,7 +124,11 @@ def run_smoke_train(
         seq_len=smoke.seq_len,
         storage_config=storage_config,
     )
-    loader = DataLoader(dataset, batch_size=1)
+    loader = DataLoader(
+        dataset,
+        batch_size=1,
+        collate_fn=lambda batch: batch[0],
+    )
     optimizer = build_adamw(model.parameters(), smoke.optimizer)
 
     output_dir.mkdir(parents=True, exist_ok=True)
