@@ -91,7 +91,7 @@ stop_rules:
 notes:
   - Launch provider: RunPod only. No AWS credentials or s3:// URIs.
   - Corpus URIs: runpod://<volume-relative-path> only (network volume).
-  - Corpus export recipe: `configs/diagnostic/corpus-export-1xb200.yaml` (CPU ok; run before preflight).
+  - "Corpus export recipe: configs/diagnostic/corpus-export-1xb200.yaml (CPU ok; run before preflight)."
   - 15B BF16 + optimizer on 1×B200 180GB is a high-risk survival smoke profile.
   - Keep seq_len=1024, micro_batch_size=1, activation checkpointing enabled.
   - Raise seq_len only after measured VRAM headroom (nvidia-smi after step 0).
